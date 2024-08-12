@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Maze Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #game-board { display: inline-block; margin: 20px; }
+        .cell { width: 30px; height: 30px; display: inline-block; border: 1px solid #ccc; margin: 1px; cursor: pointer; }
+        .start { background-color: #90EE90; }
+        .end { background-color: #FFB6C1; }
+        .selected { background-color: #ADD8E6; }
+        .invalid { background-color: #FFA07A; }
+    </style>
+</head>
+<body>
+    <h1>Word Maze Game</h1>
+    <div id="game-board"></div>
+    <p>Current Word: <span id="current-word"></span></p>
+    <p>Path: <span id="path"></span></p>
+    <p>Valid Words: <span id="valid-words"></span></p>
+    <button onclick="newGame()">New Game</button>
+    <script>
+        const BOARD_SIZE = 5;
+        let board = [];
+        const startPos = [0, 0];
+        const endPos = [BOARD_SIZE - 1, BOARD_SIZE - 1];
+
+        let currentWord = '';
+        let path = [];
+        let lastSelectedPos = null;
+        let validWords = [];
+        let dictionary = new Set();
+
+        function loadWordlist() {
+            return fetch('wordlist.txt')
+                .then(response => response.text())
+                .then(text => {
+                    const words = text.split('\n');
+                    words.forEach(word => dictionary.add(word.trim().toLowerCase()));
+                    console.log('Wordlist loaded successfully');
+                })
+                .catch(error => console.error('Error loading wordlist:', error));
+        }
+
+        function generateBoard() {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            board = [];
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                let row = [];
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    row.push(letters[Math.floor(Math.random() * letters.length)]);
+                }
+                board.push(row);
+            }
+        }
+
+        function createBoard() {
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+            for (let i = 0; i < BOARD_SIZE; i++) {
+                for (let j = 0; j < BOARD_SIZE; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.textContent = board[i][j];
+                    cell.onclick = () => selectCell(i, j);
+                    if (i === startPos[0] && j === startPos[1]) cell.classList.add('start');
+                    if (i === endPos[0] && j === endPos[1]) cell.classList.add('end');
+                    gameBoard.appendChild(cell);
+                }
+                gameBoard.appendChild(document.createElement('br'));
+            }
+        }
+
+        function selectCell(i, j) {
+            if (!lastSelectedPos || (Math.abs(i - lastSelectedPos[0]) <= 1 && Math.abs(j - lastSelectedPos[1]) <= 1)) {
+                const letter = board[i][j];
+                if (!currentWord || letter === currentWord[currentWord.length - 1]) {
+                    currentWord += letter;
+                    path.push([i, j]);
+                    lastSelectedPos = [i, j];
+                    validateWord();
+                    updateDisplay();
+                    checkWin();
+                }
+            }
+        }
+
+        function validateWord() {
+            if (dictionary.has(currentWord.toLowerCase())) {
+                if (!validWords.includes(currentWord)) {
+                    validWords.push(currentWord);
+                }
+                document.querySelectorAll('.cell').forEach((cell, index) => {
+                    const i = Math.floor(index / BOARD_SIZE);
+                    const j = index % BOARD_SIZE;
+                    if (path.some(pos => pos[0] === i && pos[1] === j)) {
+                        cell.classList.remove('invalid');
+                    }
+                });
+            } else {
+                document.querySelectorAll('.cell').forEach((cell, index) => {
+                    const i = Math.floor(index / BOARD_SIZE);
+                    const j = index % BOARD_SIZE;
+                    if (path.some(pos => pos[0] === i && pos[1] === j)) {
+                        cell.classList.add('invalid');
+                    }
+                });
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('current-word').textContent = currentWord;
+            document.getElementById('path').textContent = path.map(pos => `(${pos[0]},${pos[1]})`).join(' -> ');
+            document.getElementById('valid-words').textContent = validWords.join(', ');
+            document.querySelectorAll('.cell').forEach((cell, index) => {
+                const i = Math.floor(index / BOARD_SIZE);
+                const j = index % BOARD_SIZE;
+                if (path.some(pos => pos[0] === i && pos[1] === j)) {
+                    cell.classList.add('selected');
+                } else {
+                    cell.classList.remove('selected');
+                }
+            });
+        }
+
+        function checkWin() {
+            if (lastSelectedPos[0] === endPos[0] && lastSelectedPos[1] === endPos[1]) {
+                if (validWords.length > 0) {
+                    alert(`Congratulations! You've reached the end with ${validWords.length} valid words and ${currentWord.length} letters.`);
+                } else {
+                    alert("You've reached the end, but you need to form at least one valid word to win!");
+                }
+            }
+        }
+
+        function newGame() {
+            currentWord = '';
+            path = [];
+            lastSelectedPos = null;
+            validWords = [];
+            generateBoard();
+            createBoard();
+            updateDisplay();
+        }
+
+        // Initialize the game
+        loadWordlist().then(() => {
+            newGame();
+        });
+    </script>
+</body>
+</html>
