@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Word Maze Game</title>
+    <title>Word Maze Game - Debug Version</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         #game-board { display: inline-block; margin: 20px; }
@@ -12,15 +12,17 @@
         .end { background-color: #FFB6C1; }
         .selected { background-color: #ADD8E6; }
         .invalid { background-color: #FFA07A; }
+        #debug-info { margin-top: 20px; text-align: left; border: 1px solid #ccc; padding: 10px; }
     </style>
 </head>
 <body>
-    <h1>Word Maze Game</h1>
+    <h1>Word Maze Game - Debug Version</h1>
     <div id="game-board"></div>
     <p>Current Word: <span id="current-word"></span></p>
     <p>Path: <span id="path"></span></p>
     <p>Valid Words: <span id="valid-words"></span></p>
     <button onclick="newGame()">New Game</button>
+    <div id="debug-info"></div>
     <script>
         const BOARD_SIZE = 5;
         let board = [];
@@ -33,30 +35,72 @@
         let validWords = [];
         let dictionary = new Set();
 
+        function debug(message) {
+            const debugElement = document.getElementById('debug-info');
+            debugElement.innerHTML += message + '<br>';
+            console.log(message);
+        }
+
         function loadWordlist() {
+            debug("Attempting to load wordlist...");
             return fetch('wordlist.txt')
                 .then(response => response.text())
                 .then(text => {
                     const words = text.split('\n');
-                    words.forEach(word => dictionary.add(word.trim().toLowerCase()));
-                    console.log('Wordlist loaded successfully');
+                    words.forEach(word => {
+                        if (word.length >= 3) {
+                            dictionary.add(word.trim().toLowerCase());
+                        }
+                    });
+                    debug(`Wordlist loaded successfully. Dictionary size: ${dictionary.size}`);
                 })
-                .catch(error => console.error('Error loading wordlist:', error));
+                .catch(error => {
+                    debug(`Error loading wordlist: ${error}`);
+                    throw error;
+                });
         }
 
         function generateBoard() {
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            debug("Generating board...");
+            const vowels = 'AEIOU';
+            const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
             board = [];
             for (let i = 0; i < BOARD_SIZE; i++) {
                 let row = [];
                 for (let j = 0; j < BOARD_SIZE; j++) {
-                    row.push(letters[Math.floor(Math.random() * letters.length)]);
+                    if (Math.random() < 0.4) {
+                        row.push(vowels[Math.floor(Math.random() * vowels.length)]);
+                    } else {
+                        row.push(consonants[Math.floor(Math.random() * consonants.length)]);
+                    }
                 }
                 board.push(row);
             }
+            
+            debug("Initial board generated. Attempting to place a valid word...");
+            let attempts = 0;
+            let wordPlaced = false;
+            while (!wordPlaced && attempts < 100) {
+                attempts++;
+                const word = Array.from(dictionary)[Math.floor(Math.random() * dictionary.size)].toUpperCase();
+                if (word.length <= BOARD_SIZE) {
+                    const row = Math.floor(Math.random() * BOARD_SIZE);
+                    const col = Math.floor(Math.random() * (BOARD_SIZE - word.length + 1));
+                    for (let i = 0; i < word.length; i++) {
+                        board[row][col + i] = word[i];
+                    }
+                    wordPlaced = true;
+                    debug(`Placed word: ${word} at row ${row}, column ${col}`);
+                }
+            }
+            if (!wordPlaced) {
+                debug("Failed to place a valid word after 100 attempts.");
+            }
+            debug("Board generation complete.");
         }
 
         function createBoard() {
+            debug("Creating board in DOM...");
             const gameBoard = document.getElementById('game-board');
             gameBoard.innerHTML = '';
             for (let i = 0; i < BOARD_SIZE; i++) {
@@ -71,42 +115,29 @@
                 }
                 gameBoard.appendChild(document.createElement('br'));
             }
+            debug("Board created in DOM.");
         }
 
         function selectCell(i, j) {
-            if (!lastSelectedPos || (Math.abs(i - lastSelectedPos[0]) <= 1 && Math.abs(j - lastSelectedPos[1]) <= 1)) {
-                const letter = board[i][j];
-                if (!currentWord || letter === currentWord[currentWord.length - 1]) {
-                    currentWord += letter;
-                    path.push([i, j]);
-                    lastSelectedPos = [i, j];
-                    validateWord();
-                    updateDisplay();
-                    checkWin();
-                }
+            debug(`Cell selected: (${i}, ${j})`);
+            const letter = board[i][j];
+            if (path.length === 0 || (Math.abs(i - lastSelectedPos[0]) <= 1 && Math.abs(j - lastSelectedPos[1]) <= 1)) {
+                currentWord += letter;
+                path.push([i, j]);
+                lastSelectedPos = [i, j];
+                validateWord();
+                updateDisplay();
+                checkWin();
             }
         }
 
         function validateWord() {
+            debug(`Validating word: ${currentWord}`);
             if (dictionary.has(currentWord.toLowerCase())) {
                 if (!validWords.includes(currentWord)) {
                     validWords.push(currentWord);
+                    debug(`Valid word found: ${currentWord}`);
                 }
-                document.querySelectorAll('.cell').forEach((cell, index) => {
-                    const i = Math.floor(index / BOARD_SIZE);
-                    const j = index % BOARD_SIZE;
-                    if (path.some(pos => pos[0] === i && pos[1] === j)) {
-                        cell.classList.remove('invalid');
-                    }
-                });
-            } else {
-                document.querySelectorAll('.cell').forEach((cell, index) => {
-                    const i = Math.floor(index / BOARD_SIZE);
-                    const j = index % BOARD_SIZE;
-                    if (path.some(pos => pos[0] === i && pos[1] === j)) {
-                        cell.classList.add('invalid');
-                    }
-                });
             }
         }
 
@@ -128,14 +159,17 @@
         function checkWin() {
             if (lastSelectedPos[0] === endPos[0] && lastSelectedPos[1] === endPos[1]) {
                 if (validWords.length > 0) {
+                    debug(`Game won with ${validWords.length} valid words and ${currentWord.length} letters.`);
                     alert(`Congratulations! You've reached the end with ${validWords.length} valid words and ${currentWord.length} letters.`);
                 } else {
+                    debug("End reached but no valid words formed.");
                     alert("You've reached the end, but you need to form at least one valid word to win!");
                 }
             }
         }
 
         function newGame() {
+            debug("Starting new game...");
             currentWord = '';
             path = [];
             lastSelectedPos = null;
@@ -143,11 +177,15 @@
             generateBoard();
             createBoard();
             updateDisplay();
+            debug("New game started.");
         }
 
         // Initialize the game
+        debug("Initializing game...");
         loadWordlist().then(() => {
             newGame();
+        }).catch(error => {
+            debug(`Failed to initialize game: ${error}`);
         });
     </script>
 </body>
